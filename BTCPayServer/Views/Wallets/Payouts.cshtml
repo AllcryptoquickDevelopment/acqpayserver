@@ -5,6 +5,8 @@
 @{
     Layout = "../Shared/_NavLayout.cshtml";
     ViewData.SetActivePageAndTitle(WalletsNavPages.Payouts, "Manage payouts", Context.GetStoreData().StoreName);
+    var payoutHandler = PayoutHandlers.FirstOrDefault(handler => handler.CanHandle(Model.PaymentMethodId));
+    var actions = payoutHandler?.GetPayoutSpecificActions();
 }
 
 @section PageFootContent {
@@ -57,7 +59,11 @@
                         stateActions.Add(("cancel", "Cancel selected payouts"));
                         break;
                 }
-                <div class="tab-pane @(index == 0 ? "active" : "") " id="@state.State" role="tabpanel">
+                @if (actions?.ContainsKey(state.State) is true)
+                {
+                    stateActions.AddRange(actions[state.State]);
+                }
+                <div class="tab-pane @(index ==0? "active": "") " id="@state.State" role="tabpanel">
                     <input type="hidden" asp-for="PayoutStateSets[index].State"/>
                     <input type="hidden" asp-for="PaymentMethodId"/>
 
@@ -129,14 +135,55 @@
                                             </td>
                                         }
                                     </tr>
-                                }
-                                </tbody>
-                            </table>
-                        }
-                        else
-                        {
-                            <p class="mb-0 p-4" id="@state.State-no-payouts">No payouts.</p>
-                        }
+                                    </thead>
+                                    <tbody>
+                                    @for (int i = 0; i < state.Payouts.Count; i++)
+                                    {
+                                        var pp = state.Payouts[i];
+                                        <tr class="payout">
+                                            <td>
+                                                <span>
+                                                    <input type="checkbox" class="selection-item-@state.State.ToString()" asp-for="PayoutStateSets[index].Payouts[i].Selected"/>
+                                                    <input type="hidden" asp-for="PayoutStateSets[index].Payouts[i].PayoutId"/>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span>@pp.Date.ToBrowserDate()</span>
+                                            </td>
+                                            <td class="mw-100">
+                                                <span>@pp.PullPaymentName</span>
+                                            </td>
+                                            <td>
+                                                <span>@pp.Destination</span>
+                                            </td>
+                                            <td class="text-right">
+                                                <span>@pp.Amount</span>
+                                            </td>
+                                            @if (state.State != PayoutState.AwaitingApproval)
+                                            {
+                                                <td class="text-right">
+                                                    @if (!(pp.TransactionLink is null))
+                                                    {
+                                                        <a class="transaction-link" href="@pp.TransactionLink">Link</a>
+                                                        if (state.State == PayoutState.AwaitingPayment)
+                                                        {
+                                                            <span
+                                                                data-toggle="tooltip"
+                                                                class="fa fa-info-circle" title="A payment to the payout address of the payout amount was detected. You can approve or reject this as the actual payout transaction."></span>
+                                                        }
+                                                    }
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            }
+                            else
+                            {
+                                <p class="mb-0 p-4" id="@state.State-no-payouts">No payouts.</p>
+                            }
+                        </div>
                     </div>
                 </div>
             }
